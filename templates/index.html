@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flask Dashboard</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h1>Welcome to the Flask Dashboard!</h1>
+
+    <!-- Map Container -->
+    <div id="map" style="height: 500px;"></div>
+    
+    <!-- Canvas for Graphs -->
+    <h3>Temperature</h3>
+    <canvas id="tempChart" width="400" height="200"></canvas>
+    <h3>Distance</h3>
+    <canvas id="distanceChart" width="400" height="200"></canvas>
+
+    <script>
+        // Initialize Leaflet map
+        const map = L.map('map').setView([17.4435, 78.3489], 13); // Set default coordinates
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        // Sample Node Data from Flask Backend (passing to HTML)
+        const nodes = {{ nodes | tojson }};  // This will pass the `NODES` data to JavaScript
+
+        // Add markers for each node on the map
+        nodes.forEach(node => {
+            const marker = L.marker(node.coordinates).addTo(map);
+            marker.bindPopup(`<b>${node.name}</b><br>Click to view data`)
+                .on('click', function () {
+                    fetchData(node.channel_id); // Fetch data for this node from ThingSpeak
+                });
+        });
+
+        // Function to fetch data from Flask API and plot charts
+        function fetchData(channel_id) {
+            fetch(`/api/data/${channel_id}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Extract temperature and distance data
+                    const tempData = data.temperature;
+                    const distanceData = data.distance;
+                    const timestamps = data.timestamps;
+
+                    // Update the Temperature chart
+                    updateChart('tempChart', timestamps, tempData, 'Temperature (°C)', 'rgba(255, 99, 132, 0.2)', 'rgba(255, 99, 132, 1)');
+
+                    // Update the Distance chart
+                    updateChart('distanceChart', timestamps, distanceData, 'Distance (m)', 'rgba(54, 162, 235, 0.2)', 'rgba(54, 162, 235, 1)');
+                });
+        }
+
+        // Function to update a chart
+        function updateChart(chartId, labels, data, label, backgroundColor, borderColor) {
+            const ctx = document.getElementById(chartId).getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: label,
+                        data: data,
+                        backgroundColor: backgroundColor,
+                        borderColor: borderColor,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            ticks: {
+                                autoSkip: true,
+                                maxTicksLimit: 10
+                            }
+                        },
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
